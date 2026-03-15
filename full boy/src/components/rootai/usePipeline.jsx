@@ -241,7 +241,7 @@ Write a thorough, well-structured answer with key points, honest confidence leve
       });
       setSessionId(session.id);
 
-    } catch (err) {
+    } catch (_err) {
       setSteps(prev =>
         prev.map(s => s.status === 'running' ? { ...s, status: 'failed' } : s)
       );
