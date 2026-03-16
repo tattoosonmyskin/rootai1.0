@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { ThumbsUp, ThumbsDown, Flag, Sparkles, ChevronRight } from 'lucide-react';
+import { ThumbsUp, Flag, Sparkles, ChevronRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function FinalAnswer({ result, sessionId, onFollowUp }) {

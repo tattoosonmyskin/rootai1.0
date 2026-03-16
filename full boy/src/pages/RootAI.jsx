@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, RotateCcw, History, Zap } from 'lucide-react';
-import { usePipeline, PIPELINE_STEPS } from '../components/rootai/usePipeline';
+import { usePipeline } from '../components/rootai/usePipeline';
 import PipelineStep from '../components/rootai/PipelineStep';
 import FinalAnswer from '../components/rootai/FinalAnswer';
 import SessionHistory from '../components/rootai/SessionHistory';
