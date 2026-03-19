@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RootAI — Architecture Diagram</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <style>
+    /* ── Fallbacks so the page looks correct even if Tailwind CDN is blocked ── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: #020617;
+      color: #f8fafc;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    .hidden { display: none !important; }
+
+    /* ── Layout ── */
+    .page { display: flex; flex-direction: column; min-height: 100vh; }
+    .page-header {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      border-bottom: 1px solid #1e293b;
+    }
+    .page-header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+    .page-header p  { font-size: 0.75rem; color: #64748b; margin-top: 0.4rem; }
+
+    /* nav link back */
+    .nav-back {
+      position: absolute; top: 1.1rem; left: 1rem;
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.7rem; color: #64748b; text-decoration: none;
+      border: 1px solid #1e293b; border-radius: 0.5rem;
+      padding: 0.35rem 0.75rem; transition: color 0.15s, border-color 0.15s;
+    }
+    .nav-back:hover { color: #cbd5e1; border-color: #334155; }
+    .nav-back svg { width: 0.75rem; height: 0.75rem; }
+
+    /* ── Diagram wrapper ── */
+    .diagram-outer {
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.5rem 1rem 1rem;
+    }
+    .diagram-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+    }
+    /* Maintain 900×580 aspect ratio */
+    .diagram-canvas {
+      position: relative;
+      width: 100%;
+      padding-bottom: 64.44%; /* 580/900 */
+      overflow: visible;
+    }
+    .diagram-canvas > * { position: absolute; top: 0; left: 0; }
+    .diagram-canvas svg { width: 100%; height: 100%; overflow: visible; }
+
+    /* ── Node base ── */
+    .node {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border: 1px solid;
+      padding: 0.25rem 0.5rem;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      font-size: 0.6875rem;  /* 11px */
+      font-weight: 600;
+      line-height: 1.25;
+      white-space: pre-line;
+      transform: translateX(-50%);
+      border-radius: 0.75rem;
+    }
+    .node.pill { border-radius: 999px; }
+    .node .sublabel {
+      font-size: 0.5625rem; /* 9px */
+      color: #64748b;
+      margin-top: 0.1rem;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    /* ── Tier colours ── */
+    .tier-input    { border-color: rgba(14,165,233,0.5);  background: rgba(14,165,233,0.10);  color: #7dd3fc; }
+    .tier-core     { border-color: rgba(139,92,246,0.5);  background: rgba(139,92,246,0.10);  color: #c4b5fd; }
+    .tier-process  { border-color: rgba(16,185,129,0.5);  background: rgba(16,185,129,0.10);  color: #6ee7b7; }
+    .tier-resource { border-color: rgba(245,158,11,0.5);  background: rgba(245,158,11,0.10);  color: #fcd34d; }
+    .tier-check    { border-color: rgba(249,115,22,0.5);  background: rgba(249,115,22,0.10);  color: #fdba74; }
+    .tier-output   { border-color: rgba(244,63,94,0.5);   background: rgba(244,63,94,0.10);   color: #fda4af; }
+    .tier-external { border-color: rgba(100,116,139,0.5); background: rgba(100,116,139,0.10); color: #cbd5e1; }
+
+    /* ── Core tier boundary ── */
+    .core-boundary {
+      position: absolute;
+      border: 1px dashed rgba(139,92,246,0.2);
+      background: rgba(139,92,246,0.02);
+      border-radius: 1rem;
+    }
+    .core-boundary-label {
+      position: absolute;
+      top: -0.6rem; left: 0.75rem;
+      font-size: 0.5625rem;
+      font-family: ui-monospace, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(139,92,246,0.4);
+      background: #020617;
+      padding: 0 0.25rem;
+    }
+
+    /* ── Grid background ── */
+    .grid-bg {
+      position: absolute; inset: 0;
+      opacity: 0.03;
+      background-image: radial-gradient(circle, rgb(148,163,184) 1px, transparent 1px);
+      background-size: 20px 20px;
+      pointer-events: none;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 1.25rem 1rem 1.5rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.6875rem;
+      color: #64748b;
+    }
+    .legend-swatch {
+      width: 0.75rem; height: 0.75rem;
+      border-radius: 0.2rem;
+      border: 1px solid;
+      flex-shrink: 0;
+    }
+
+    /* ── Fade-in animation ── */
+    @keyframes fade-in-up {
+      from { opacity: 0; transform: translateX(-50%) scale(0.85); }
+      to   { opacity: 1; transform: translateX(-50%) scale(1); }
+    }
+    .node { animation: fade-in-up 0.4s ease both; }
+
+    /* ── Responsive: shrink text on very small screens ── */
+    @media (max-width: 480px) {
+      .node { font-size: 0.5rem; padding: 0.15rem 0.3rem; }
+      .node .sublabel { font-size: 0.45rem; }
+      .core-boundary-label { font-size: 0.4rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="page-header" style="position:relative;">
+    <a href="/" class="nav-back">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Back to Query
+    </a>
+    <h1>
+      <span style="color:#34d399">Root</span><span style="color:#cbd5e1">AI</span>
+      <span style="color:#64748b; font-weight:300; margin-left:0.4rem; font-size:1.1rem">Architecture</span>
+    </h1>
+    <p>Semantic reasoning pipeline with etymological grounding and constraint verification</p>
+  </header>
+
+  <!-- ═══ DIAGRAM ═══ -->
+  <div class="diagram-outer">
+    <div class="diagram-container">
+      <div class="diagram-canvas" id="canvas">
+
+        <!-- Grid background -->
+        <div class="grid-bg"></div>
+
+        <!-- Core Knowledge Layer boundary -->
+        <div class="core-boundary" style="left:14%; top:43%; width:42%; height:18%;">
+          <span class="core-boundary-label">Core Knowledge Layer</span>
+        </div>
+
+        <!-- ═══ SVG CONNECTIONS ═══ -->
+        <svg id="connections" viewBox="0 0 900 580" preserveAspectRatio="none">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="rgba(148,163,184,0.4)"/>
+            </marker>
+          </defs>
+          <!-- user-query → prompt-analyzer -->
+          <line x1="477" y1="32"  x2="477" y2="93"  stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- prompt-analyzer → kg-navigator -->
+          <line x1="414" y1="119" x2="297" y2="174" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- prompt-analyzer → rag-engine -->
+          <line x1="531" y1="119" x2="576" y2="174" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- kg-navigator → etym-kg -->
+          <line x1="297" y1="221" x2="243" y2="278" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- kg-navigator → doc-store -->
+          <line x1="360" y1="221" x2="432" y2="273" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- rag-engine → doc-store -->
+          <line x1="522" y1="221" x2="495" y2="273" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- rag-engine → reasoning-engine -->
+          <line x1="630" y1="221" x2="666" y2="278" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- etym-kg → resource-manager -->
+          <line x1="243" y1="325" x2="207" y2="389" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- doc-store → resource-manager -->
+          <line x1="342" y1="325" x2="270" y2="389" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- reasoning-engine → causal-checker -->
+          <line x1="666" y1="325" x2="630" y2="389" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- resource-manager → central-repo -->
+          <line x1="207" y1="435" x2="207" y2="493" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- causal-checker → standard-llm -->
+          <line x1="630" y1="435" x2="657" y2="493" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <!-- reasoning-engine → human-review -->
+          <line x1="720" y1="302" x2="765" y2="302" stroke="rgba(148,163,184,0.3)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+        </svg>
+
+        <!--
+          Nodes: left/top are % of canvas, width/height fixed px.
+          transform: translateX(-50%) is applied by .node class.
+          animation-delay staggers each node's fade-in.
+        -->
+
+        <!-- User Query — input tier, pill shape -->
+        <div class="node pill tier-input"
+             style="left:53%; top:2%; width:110px; height:42px; animation-delay:0s">
+          User Query
+        </div>
+
+        <!-- Prompt Analyzer — core tier -->
+        <div class="node tier-core"
+             style="left:53%; top:16%; width:130px; height:42px; animation-delay:0.15s">
+          Prompt Analyzer
+        </div>
+
+        <!-- Knowledge Graph Navigator — process tier -->
+        <div class="node tier-process"
+             style="left:33%; top:30%; width:140px; height:48px; animation-delay:0.30s">
+          Knowledge Graph&#10;Navigator
+        </div>
+
+        <!-- RAG Engine — process tier -->
+        <div class="node tier-process"
+             style="left:64%; top:30%; width:120px; height:42px; animation-delay:0.30s">
+          RAG Engine
+        </div>
+
+        <!-- Etymological KG — core tier -->
+        <div class="node tier-core"
+             style="left:27%; top:48%; width:140px; height:48px; animation-delay:0.45s">
+          Etymological&#10;Knowledge Graph
+        </div>
+
+        <!-- Document Store — core tier -->
+        <div class="node tier-core"
+             style="left:48%; top:47%; width:160px; height:54px; animation-delay:0.45s">
+          Document Store
+          <span class="sublabel">e.g., Wikipedia, Academic Texts</span>
+        </div>
+
+        <!-- Reasoning Engine — process tier -->
+        <div class="node tier-process"
+             style="left:74%; top:48%; width:130px; height:42px; animation-delay:0.45s">
+          Reasoning Engine
+        </div>
+
+        <!-- Resource Manager — resource tier -->
+        <div class="node tier-resource"
+             style="left:23%; top:67%; width:145px; height:50px; animation-delay:0.60s">
+          Resource Manager
+          <span class="sublabel">(API/file)</span>
+        </div>
+
+        <!-- Causal & Constraint Checker — check tier -->
+        <div class="node tier-check"
+             style="left:70%; top:67%; width:150px; height:48px; animation-delay:0.60s">
+          Causal &amp; Constraint&#10;Checker
+        </div>
+
+        <!-- Central Repository — output tier -->
+        <div class="node tier-output"
+             style="left:23%; top:85%; width:150px; height:48px; animation-delay:0.75s">
+          Central Repository&#10;Manifest v2.1
+        </div>
+
+        <!-- Standard LLM — output tier -->
+        <div class="node tier-output"
+             style="left:73%; top:85%; width:145px; height:48px; animation-delay:0.75s">
+          Standard LLM
+          <span class="sublabel">(GPT, Claude, Ollama, etc.)</span>
+        </div>
+
+        <!-- Human Review — external tier -->
+        <div class="node tier-external"
+             style="left:88%; top:48%; width:100px; height:42px; animation-delay:0.90s">
+          Human-Fact&#10;Review
+        </div>
+
+      </div><!-- /diagram-canvas -->
+    </div><!-- /diagram-container -->
+  </div><!-- /diagram-outer -->
+
+  <!-- ═══ LEGEND ═══ -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(14,165,233,0.3); border-color:rgba(14,165,233,0.5)"></div>
+      Input
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(139,92,246,0.3); border-color:rgba(139,92,246,0.5)"></div>
+      Core Knowledge
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(16,185,129,0.3); border-color:rgba(16,185,129,0.5)"></div>
+      Processing
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(245,158,11,0.3); border-color:rgba(245,158,11,0.5)"></div>
+      Resource
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(249,115,22,0.3); border-color:rgba(249,115,22,0.5)"></div>
+      Validation
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(244,63,94,0.3); border-color:rgba(244,63,94,0.5)"></div>
+      Output
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(100,116,139,0.3); border-color:rgba(100,116,139,0.5)"></div>
+      External
+    </div>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RootAI — Semantic Reasoning Pipeline</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Marked.js for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <style>
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    /* Critical utility — must work even if Tailwind CDN is blocked */
+    .hidden { display: none !important; }
+    .flex   { display: flex; }
+    .block  { display: block; }
+    /* Pulse animation for running steps */
+    @keyframes slide-x {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(400%); }
+    }
+    .animate-slide-x { animation: slide-x 1.2s ease-in-out infinite; }
+    /* Spin animation */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    /* Fade-in */
+    @keyframes fade-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fade-in 0.4s ease forwards; }
+    /* Prose overrides */
+    .prose-custom p  { margin-bottom: 0.75rem; line-height: 1.65; }
+    .prose-custom ul { padding-left: 1.2rem; margin-bottom: 0.75rem; }
+    .prose-custom li { margin-bottom: 0.25rem; }
+    .prose-custom h1,.prose-custom h2,.prose-custom h3 { font-weight: 600; margin: 1rem 0 0.4rem; }
+    .prose-custom code { background: #1e293b; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.8rem; }
+    .prose-custom pre  { background: #0f172a; padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 0.75rem; }
+    .prose-custom blockquote { border-left: 3px solid #475569; padding-left: 0.75rem; color: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header id="header" class="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
+  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+    <!-- Logo -->
+    <div class="flex items-center gap-2.5">
+      <div class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <div>
+        <span class="text-base font-bold tracking-tight">
+          <span class="text-emerald-400">Root</span><span class="text-slate-200">AI</span>
+        </span>
+        <span class="text-[10px] text-slate-500 ml-2 hidden sm:inline">Semantic Reasoning Pipeline</span>
+      </div>
+    </div>
+    <!-- Actions -->
+    <div class="flex items-center gap-2">
+      <button id="btn-reset" class="hidden items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-800 hover:border-slate-600 rounded-lg px-3 py-1.5 transition-colors">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Reset
+      </button>
+      <button id="btn-history" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-800 hover:border-slate-600 rounded-lg px-3 py-1.5 transition-colors">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        History
+      </button>
+      <a href="/diagram.html" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/40 rounded-lg px-3 py-1.5 transition-colors" style="text-decoration:none">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        Diagram
+      </a>
+      <button id="btn-settings" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-800 hover:border-slate-600 rounded-lg px-3 py-1.5 transition-colors">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+        Settings
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<main class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 flex flex-col gap-6">
+
+  <!-- Query Input -->
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+    <div class="px-4 pt-3 pb-1">
+      <p class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Query</p>
+    </div>
+    <div class="flex items-end gap-2 px-4 pb-3">
+      <textarea
+        id="query-input"
+        placeholder="Ask anything — RootAI will reason through it step by step…"
+        rows="2"
+        class="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none leading-relaxed"
+      ></textarea>
+      <button
+        id="btn-run"
+        class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs font-medium rounded-xl px-4 py-2 transition-colors flex-shrink-0"
+      >
+        <svg id="run-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+        <div id="run-spinner" class="hidden w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        <span id="run-label" class="hidden sm:inline">Run</span>
+      </button>
+    </div>
+    <div class="px-4 pb-2">
+      <p class="text-[10px] text-slate-600">Press ⌘↵ / Ctrl↵ to run</p>
+    </div>
+  </div>
+
+  <!-- Pipeline Steps -->
+  <div id="pipeline-section" class="hidden space-y-2 animate-fade-in">
+    <p class="text-[10px] font-mono uppercase tracking-wider text-slate-500 px-1">Pipeline</p>
+    <div id="pipeline-steps"></div>
+  </div>
+
+  <!-- Final Answer -->
+  <div id="final-section" class="hidden animate-fade-in"></div>
+
+  <!-- Empty State -->
+  <div id="empty-state" class="flex-1 flex flex-col items-center justify-center py-16 gap-4 text-center animate-fade-in">
+    <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+      <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+    </div>
+    <div>
+      <h2 class="text-lg font-semibold text-slate-200">6-Layer Reasoning Pipeline</h2>
+      <p class="text-sm text-slate-500 mt-1 max-w-sm">
+        Your query runs through Prompt Analysis → Knowledge Graph → RAG → Reasoning → Constraint Checking → LLM Synthesis
+      </p>
+    </div>
+    <div id="example-queries" class="flex flex-wrap justify-center gap-2 mt-2"></div>
+  </div>
+
+  <div id="scroll-anchor"></div>
+</main>
+
+<!-- ═══════════════════ HISTORY SIDEBAR ═══════════════════ -->
+<div id="history-overlay" class="hidden fixed inset-0 bg-black/50 z-40"></div>
+<aside id="history-sidebar" class="fixed top-0 right-0 h-full w-80 bg-slate-950 border-l border-slate-800 z-50 flex flex-col translate-x-full transition-transform duration-300">
+  <div class="flex items-center justify-between px-4 py-4 border-b border-slate-800">
+    <h2 class="text-sm font-semibold text-slate-200">Session History</h2>
+    <button id="btn-close-history" class="text-slate-500 hover:text-slate-200 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="history-list" class="flex-1 overflow-y-auto py-2">
+    <p class="text-xs text-slate-500 text-center py-10">Loading…</p>
+  </div>
+</aside>
+
+<!-- ═══════════════════ SETTINGS MODAL ═══════════════════ -->
+<div id="settings-overlay" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-slate-200">LLM Settings</h2>
+      <button id="btn-close-settings" class="text-slate-500 hover:text-slate-200 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="px-5 py-5 space-y-4">
+      <!-- Preset buttons -->
+      <div>
+        <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-2">Quick Presets</label>
+        <div class="flex flex-wrap gap-2">
+          <button class="preset-btn text-xs border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5 text-slate-300 transition-colors" data-base="https://api.openai.com/v1" data-model="gpt-4o-mini">OpenAI</button>
+          <button class="preset-btn text-xs border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5 text-slate-300 transition-colors" data-base="http://localhost:11434/v1" data-model="llama3" data-key="ollama">Ollama (local)</button>
+          <button class="preset-btn text-xs border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5 text-slate-300 transition-colors" data-base="http://localhost:1234/v1" data-model="local-model" data-key="lmstudio">LM Studio</button>
+        </div>
+      </div>
+      <!-- API Key -->
+      <div>
+        <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1.5">API Key</label>
+        <input id="s-api-key" type="password" placeholder="sk-… (or 'ollama' for local)" class="w-full bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500/50 placeholder-slate-600" />
+      </div>
+      <!-- Base URL -->
+      <div>
+        <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1.5">Base URL</label>
+        <input id="s-base-url" type="text" placeholder="https://api.openai.com/v1" class="w-full bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500/50 placeholder-slate-600" />
+      </div>
+      <!-- Model -->
+      <div>
+        <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1.5">Model</label>
+        <input id="s-model" type="text" placeholder="gpt-4o-mini" class="w-full bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 px-3 py-2 focus:outline-none focus:border-emerald-500/50 placeholder-slate-600" />
+      </div>
+      <!-- Info -->
+      <p class="text-[11px] text-slate-500 leading-relaxed">
+        Settings are saved to <code class="bg-slate-800 px-1 rounded">.env</code> on the server and persist across restarts.
+        For local Ollama, set key to <code class="bg-slate-800 px-1 rounded">ollama</code> and base URL to
+        <code class="bg-slate-800 px-1 rounded">http://localhost:11434/v1</code>.
+      </p>
+    </div>
+    <div class="flex items-center justify-between px-5 py-4 border-t border-slate-800">
+      <span id="settings-status" class="text-xs text-slate-500"></span>
+      <button id="btn-save-settings" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl px-5 py-2 transition-colors">
+        Save & Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const PIPELINE_STEPS = [
+  { id: 'prompt_analyzer',    label: 'Prompt Analyzer',            description: 'Semantic decomposition & intent analysis',       icon: 'brain'   },
+  { id: 'kg_navigator',       label: 'Knowledge Graph Navigator',  description: 'Etymological graph traversal & concept linking', icon: 'network' },
+  { id: 'rag_engine',         label: 'RAG Engine',                 description: 'Context retrieval & core concept mapping',       icon: 'search'  },
+  { id: 'reasoning_engine',   label: 'Reasoning Engine',           description: 'Logical inference & chain-of-thought',           icon: 'cpu'     },
+  { id: 'constraint_checker', label: 'Causal & Constraint Checker',description: 'Logic validation & execution plan verification', icon: 'shield'  },
+  { id: 'standard_llm',       label: 'Standard LLM Synthesis',     description: 'Final structured answer (any LLM)',             icon: 'sparkles'},
+];
+
+let isRunning = false;
+let currentSessionId = null;
+
+// ── Icons (SVG strings) ───────────────────────────────────────────────────────
+const ICONS = {
+  brain:    `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>`,
+  network:  `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" stroke-width="1.5"/><circle cx="5" cy="19" r="2" stroke-width="1.5"/><circle cx="19" cy="19" r="2" stroke-width="1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 7v4M8.5 17.5l3.5-6.5M15.5 17.5L12 11"/></svg>`,
+  search:   `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-4.35-4.35"/></svg>`,
+  cpu:      `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.5"/><rect x="9" y="9" width="6" height="6" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>`,
+  shield:   `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`,
+  sparkles: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3l1.5 4.5L11 9l-4.5 1.5L5 15l-1.5-4.5L-1 9l4.5-1.5L5 3zM19 12l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z"/></svg>`,
+};
+
+const ICON_COLORS = {
+  brain:    'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+  network:  'text-sky-400 bg-sky-500/10 border-sky-500/30',
+  search:   'text-sky-400 bg-sky-500/10 border-sky-500/30',
+  cpu:      'text-sky-400 bg-sky-500/10 border-sky-500/30',
+  shield:   'text-amber-400 bg-amber-500/10 border-amber-500/30',
+  sparkles: 'text-violet-400 bg-violet-500/10 border-violet-500/30',
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const queryInput    = $('query-input');
+const btnRun        = $('btn-run');
+const runIcon       = $('run-icon');
+const runSpinner    = $('run-spinner');
+const runLabel      = $('run-label');
+const btnReset      = $('btn-reset');
+const pipelineSection = $('pipeline-section');
+const pipelineSteps   = $('pipeline-steps');
+const finalSection    = $('final-section');
+const emptyState      = $('empty-state');
+
+// ── Example queries ───────────────────────────────────────────────────────────
+const EXAMPLES = [
+  'What is the etymology of "serendipity"?',
+  'How does photosynthesis work?',
+  'Explain the trolley problem',
+];
+const exContainer = $('example-queries');
+EXAMPLES.forEach(ex => {
+  const btn = document.createElement('button');
+  btn.textContent = ex;
+  btn.className = 'text-xs text-slate-400 border border-slate-800 rounded-full px-3 py-1 hover:border-slate-600 hover:text-slate-200 transition-colors';
+  btn.onclick = () => { queryInput.value = ex; queryInput.focus(); };
+  exContainer.appendChild(btn);
+});
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setRunning(v) {
+  isRunning = v;
+  btnRun.disabled = v;
+  queryInput.disabled = v;
+  runIcon.classList.toggle('hidden', v);
+  runSpinner.classList.toggle('hidden', !v);
+  runLabel.textContent = v ? 'Running…' : 'Run';
+}
+
+function showStarted() {
+  emptyState.classList.add('hidden');
+  pipelineSection.classList.remove('hidden');
+  btnReset.classList.remove('hidden');
+  btnReset.classList.add('flex');
+}
+
+function resetUI() {
+  pipelineSteps.innerHTML = '';
+  finalSection.innerHTML = '';
+  finalSection.classList.add('hidden');
+  pipelineSection.classList.add('hidden');
+  emptyState.classList.remove('hidden');
+  btnReset.classList.add('hidden');
+  btnReset.classList.remove('flex');
+  currentSessionId = null;
+  setRunning(false);
+}
+
+function scrollBottom() {
+  $('scroll-anchor').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Step card builders ────────────────────────────────────────────────────────
+function initStepCard(step) {
+  const el = document.createElement('div');
+  el.id = `step-${step.id}`;
+  el.className = 'rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm overflow-hidden';
+  el.innerHTML = `
+    <div class="step-header flex items-center gap-3 px-4 py-3">
+      <div class="step-icon w-9 h-9 rounded-lg border flex items-center justify-center flex-shrink-0 ${ICON_COLORS[step.icon]}">
+        ${ICONS[step.icon]}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono text-slate-500">${String(PIPELINE_STEPS.indexOf(step) + 1).padStart(2,'0')}</span>
+          <span class="text-sm font-semibold text-slate-100 truncate">${step.label}</span>
+        </div>
+        <p class="text-[11px] text-slate-500 truncate">${step.description}</p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0 step-status-area">
+        <span class="step-status-label text-[11px] font-medium text-slate-600 hidden sm:block">Pending</span>
+        <span class="step-status-icon">
+          <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
+        </span>
+      </div>
+    </div>
+    <div class="step-pulse hidden h-0.5 w-full bg-slate-800 overflow-hidden">
+      <div class="h-full bg-sky-400 w-1/3 animate-slide-x"></div>
+    </div>
+    <div class="step-result hidden border-t border-slate-800 max-h-72 overflow-y-auto">
+      <div class="p-4 step-result-content text-xs text-slate-300"></div>
+    </div>
+  `;
+
+  // Click to expand result
+  el.querySelector('.step-header').addEventListener('click', () => {
+    const resultEl = el.querySelector('.step-result');
+    if (resultEl.classList.contains('hidden')) return;
+    const isOpen = !resultEl.style.display || resultEl.style.display !== 'none';
+    // Toggle
+    resultEl.classList.toggle('hidden');
+    // Update chevron
+    updateChevron(el, resultEl.classList.contains('hidden'));
+  });
+
+  return el;
+}
+
+function updateChevron(el, collapsed) {
+  const area = el.querySelector('.step-status-area');
+  const existing = area.querySelector('.chevron');
+  if (existing) existing.remove();
+  if (!collapsed) {
+    const ch = document.createElement('span');
+    ch.className = 'chevron';
+    ch.innerHTML = `<svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>`;
+    area.appendChild(ch);
+  } else {
+    const ch = document.createElement('span');
+    ch.className = 'chevron';
+    ch.innerHTML = `<svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>`;
+    area.appendChild(ch);
+  }
+}
+
+function markStepRunning(stepId) {
+  const el = document.getElementById(`step-${stepId}`);
+  if (!el) return;
+  el.className = 'rounded-xl border border-sky-500/40 shadow-sky-500/10 shadow-lg bg-slate-900/60 backdrop-blur-sm overflow-hidden';
+  el.querySelector('.step-status-label').textContent = 'Running…';
+  el.querySelector('.step-status-label').className = 'step-status-label text-[11px] font-medium text-sky-400 hidden sm:block';
+  el.querySelector('.step-status-icon').innerHTML = `
+    <div class="w-4 h-4 border-2 border-sky-500/30 border-t-sky-400 rounded-full animate-spin"></div>
+  `;
+  el.querySelector('.step-pulse').classList.remove('hidden');
+}
+
+function markStepDone(stepId, result) {
+  const el = document.getElementById(`step-${stepId}`);
+  if (!el) return;
+  el.className = 'rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm overflow-hidden';
+  el.querySelector('.step-status-label').textContent = 'Done';
+  el.querySelector('.step-status-label').className = 'step-status-label text-[11px] font-medium text-emerald-400 hidden sm:block';
+  el.querySelector('.step-status-icon').innerHTML = `
+    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  `;
+  el.querySelector('.step-pulse').classList.add('hidden');
+  el.querySelector('.step-header').classList.add('cursor-pointer');
+  // Render result
+  const resultEl = el.querySelector('.step-result');
+  resultEl.querySelector('.step-result-content').innerHTML = renderData(result);
+  resultEl.classList.remove('hidden');
+  updateChevron(el, false);
+}
+
+function markStepFailed(stepId) {
+  const el = document.getElementById(`step-${stepId}`);
+  if (!el) return;
+  el.className = 'rounded-xl border border-red-500/30 bg-slate-900/60 backdrop-blur-sm overflow-hidden';
+  el.querySelector('.step-status-label').textContent = 'Failed';
+  el.querySelector('.step-status-label').className = 'step-status-label text-[11px] font-medium text-red-400 hidden sm:block';
+  el.querySelector('.step-status-icon').innerHTML = `
+    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  `;
+  el.querySelector('.step-pulse').classList.add('hidden');
+}
+
+// ── Data renderer ─────────────────────────────────────────────────────────────
+function renderData(data, depth = 0) {
+  if (data === null || data === undefined) return '';
+  if (typeof data === 'boolean') {
+    return `<span class="font-mono ${data ? 'text-emerald-400' : 'text-red-400'}">${data}</span>`;
+  }
+  if (typeof data === 'number') {
+    const pct = data <= 1 ? Math.round(data * 100) : data;
+    return `<div class="flex items-center gap-2">
+      <div class="flex-1 h-1.5 bg-slate-700 rounded-full max-w-[120px]">
+        <div class="h-full bg-emerald-400 rounded-full" style="width:${Math.min(pct,100)}%"></div>
+      </div>
+      <span class="text-emerald-400 font-mono">${pct}${data <= 1 ? '%' : ''}</span>
+    </div>`;
+  }
+  if (typeof data === 'string') {
+    return `<p class="text-slate-300 leading-relaxed">${escHtml(data)}</p>`;
+  }
+  if (Array.isArray(data)) {
+    if (data.length === 0) return '<span class="text-slate-600 italic">empty</span>';
+    if (typeof data[0] === 'object') {
+      return data.map((item, i) => {
+        const label = item.term || item.title || item.from || `Item ${i + 1}`;
+        return `<details class="mt-1"><summary class="cursor-pointer text-slate-400 hover:text-slate-200 text-[11px] font-mono">${escHtml(String(label))}</summary><div class="ml-4 mt-1">${renderData(item, depth + 1)}</div></details>`;
+      }).join('');
+    }
+    return `<ul class="space-y-1">${data.map((v,i) => `<li class="flex gap-1.5"><span class="text-slate-600 font-mono flex-shrink-0">${i+1}.</span><span>${escHtml(String(v))}</span></li>`).join('')}</ul>`;
+  }
+  if (typeof data === 'object') {
+    return `<div class="space-y-2">${Object.entries(data).map(([k,v]) => {
+      const label = k.replace(/_/g, ' ');
+      if (typeof v === 'object' && v !== null && depth < 2) {
+        return `<div><p class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">${escHtml(label)}</p><div class="ml-2">${renderData(v, depth+1)}</div></div>`;
+      }
+      return `<div class="flex gap-2"><span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 flex-shrink-0 w-28 truncate pt-0.5">${escHtml(label)}</span><div class="flex-1 min-w-0">${renderData(v, depth+1)}</div></div>`;
+    }).join('')}</div>`;
+  }
+  return `<span class="text-slate-400">${escHtml(String(data))}</span>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Final answer renderer ─────────────────────────────────────────────────────
+function renderFinalAnswer(result, sessionId) {
+  currentSessionId = sessionId;
+  const confidence = result.confidence_level <= 1
+    ? Math.round(result.confidence_level * 100)
+    : (result.confidence_level || 0);
+
+  const keyPoints = (result.key_points || []).map(p =>
+    `<li class="flex items-start gap-2 text-xs text-slate-300"><span class="w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5 flex-shrink-0"></span>${escHtml(p)}</li>`
+  ).join('');
+
+  const caveats = (result.caveats || []).map(c =>
+    `<li class="text-xs text-amber-200/70">⚠ ${escHtml(c)}</li>`
+  ).join('');
+
+  const followUps = (result.follow_up_questions || []).map(q =>
+    `<button class="follow-up-btn flex items-center gap-1 text-xs text-slate-300 border border-slate-700 rounded-full px-3 py-1 hover:border-slate-500 hover:text-slate-100 transition-colors" data-q="${escHtml(q)}">${escHtml(q)} <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>`
+  ).join('');
+
+  finalSection.innerHTML = `
+    <div class="rounded-2xl border border-violet-500/30 bg-slate-900/80 backdrop-blur-sm overflow-hidden animate-fade-in">
+      <!-- header -->
+      <div class="flex items-center justify-between px-5 py-3 border-b border-violet-500/20 bg-violet-500/5">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3l1.5 4.5L11 9l-4.5 1.5L5 15l-1.5-4.5L-1 9l4.5-1.5L5 3zM19 12l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z"/></svg>
+          <span class="text-sm font-semibold text-violet-300">Final Answer</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="h-1.5 w-20 bg-slate-700 rounded-full overflow-hidden">
+            <div class="h-full bg-violet-400 rounded-full" style="width:${confidence}%"></div>
+          </div>
+          <span class="text-[11px] text-violet-400 font-mono">${confidence}% confidence</span>
+        </div>
+      </div>
+      <!-- answer -->
+      <div class="px-5 py-4">
+        <div class="prose-custom text-slate-200 text-sm leading-relaxed" id="final-answer-body"></div>
+      </div>
+      ${keyPoints ? `<div class="px-5 pb-4"><p class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">Key Points</p><ul class="space-y-1.5">${keyPoints}</ul></div>` : ''}
+      ${caveats ? `<div class="mx-5 mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"><p class="text-[10px] font-mono uppercase tracking-wider text-amber-500/70 mb-1.5">Caveats</p><ul class="space-y-1">${caveats}</ul></div>` : ''}
+      ${followUps ? `<div class="px-5 pb-4"><p class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">Suggested Follow-ups</p><div class="flex flex-wrap gap-2">${followUps}</div></div>` : ''}
+      <!-- review -->
+      <div class="flex items-center justify-between px-5 py-3 border-t border-slate-800 bg-slate-900/50">
+        <span class="text-[11px] text-slate-500">Human-Fact Review</span>
+        <div id="review-buttons" class="flex items-center gap-2">
+          <button id="btn-approve" class="flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-400 border border-slate-700 hover:border-emerald-500/40 rounded-lg px-2.5 py-1 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+            Approve
+          </button>
+          <button id="btn-flag" class="flex items-center gap-1 text-xs text-slate-400 hover:text-amber-400 border border-slate-700 hover:border-amber-500/40 rounded-lg px-2.5 py-1 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+            Flag
+          </button>
+        </div>
+      </div>
+      <!-- flag form -->
+      <div id="flag-form" class="hidden px-5 pb-4 pt-1">
+        <textarea id="flag-note" placeholder="Describe the issue…" class="w-full bg-slate-800 border border-amber-500/30 rounded-lg text-xs text-slate-300 p-2.5 resize-none h-16 placeholder-slate-600 focus:outline-none focus:border-amber-500/60"></textarea>
+        <button id="btn-submit-flag" class="mt-2 text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1 hover:bg-amber-500/10 transition-colors">Submit Flag</button>
+      </div>
+    </div>
+  `;
+  finalSection.classList.remove('hidden');
+
+  // Render markdown answer
+  if (typeof marked !== 'undefined') {
+    document.getElementById('final-answer-body').innerHTML = marked.parse(result.answer || '');
+  } else {
+    document.getElementById('final-answer-body').textContent = result.answer || '';
+  }
+
+  // Follow-up button handlers
+  finalSection.querySelectorAll('.follow-up-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      queryInput.value = btn.dataset.q;
+      resetUI();
+      setTimeout(() => runPipeline(btn.dataset.q), 100);
+    });
+  });
+
+  // Review handlers
+  document.getElementById('btn-approve').addEventListener('click', () => submitReview('approved', ''));
+  document.getElementById('btn-flag').addEventListener('click', () => {
+    document.getElementById('flag-form').classList.remove('hidden');
+  });
+  document.getElementById('btn-submit-flag').addEventListener('click', () => {
+    const note = document.getElementById('flag-note').value;
+    submitReview('flagged', note);
+  });
+}
+
+async function submitReview(rating, notes) {
+  if (!currentSessionId) return;
+  try {
+    await fetch(`/api/sessions/${currentSessionId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating, notes }),
+    });
+  } catch {}
+  const reviewEl = document.getElementById('review-buttons');
+  if (reviewEl) {
+    reviewEl.innerHTML = `<span class="text-xs font-medium ${rating === 'approved' ? 'text-emerald-400' : 'text-amber-400'}">${rating === 'approved' ? '✓ Approved' : '⚑ Flagged'}</span>`;
+  }
+  const flagForm = document.getElementById('flag-form');
+  if (flagForm) flagForm.classList.add('hidden');
+}
+
+// ── Pipeline runner ───────────────────────────────────────────────────────────
+async function runPipeline(query) {
+  setRunning(true);
+  showStarted();
+
+  // Init step cards
+  pipelineSteps.innerHTML = '';
+  PIPELINE_STEPS.forEach(step => {
+    const card = initStepCard(step);
+    pipelineSteps.appendChild(card);
+  });
+
+  // Get LLM overrides from sessionStorage (set by settings)
+  const settings = getSessionSettings();
+
+  let buffer = '';
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        api_key:  settings.apiKey  || null,
+        base_url: settings.baseUrl || null,
+        model:    settings.model   || null,
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE lines
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (raw === '[DONE]') break;
+        try {
+          const event = JSON.parse(raw);
+          handleEvent(event);
+        } catch {}
+      }
+    }
+  } catch (err) {
+    // Mark any running steps as failed
+    PIPELINE_STEPS.forEach(s => {
+      const el = document.getElementById(`step-${s.id}`);
+      if (el) {
+        const statusLabel = el.querySelector('.step-status-label');
+        if (statusLabel && (statusLabel.textContent === 'Running…' || statusLabel.textContent === 'Pending')) {
+          markStepFailed(s.id);
+        }
+      }
+    });
+    // Show error in final section
+    finalSection.innerHTML = `
+      <div class="rounded-2xl border border-red-500/30 bg-slate-900/80 px-5 py-4 animate-fade-in">
+        <p class="text-sm font-semibold text-red-400 mb-1">Pipeline Error</p>
+        <p class="text-xs text-slate-400">${escHtml(err.message)}</p>
+        <p class="text-xs text-slate-500 mt-2">Check your LLM settings (⚙ Settings) and try again.</p>
+      </div>`;
+    finalSection.classList.remove('hidden');
+  }
+
+  setRunning(false);
+}
+
+function handleEvent(event) {
+  if (event.type === 'step_start') {
+    markStepRunning(event.step_id);
+    scrollBottom();
+  } else if (event.type === 'step_complete') {
+    markStepDone(event.step_id, event.result);
+  } else if (event.type === 'final') {
+    renderFinalAnswer(event.result, event.session_id);
+    scrollBottom();
+  } else if (event.type === 'error') {
+    PIPELINE_STEPS.forEach(s => markStepFailed(s.id));
+    finalSection.innerHTML = `
+      <div class="rounded-2xl border border-red-500/30 bg-slate-900/80 px-5 py-4 animate-fade-in">
+        <p class="text-sm font-semibold text-red-400 mb-1">Error</p>
+        <p class="text-xs text-slate-400">${escHtml(event.message || 'Unknown error')}</p>
+        ${event.message && event.message.includes('API key') ? `<p class="text-xs text-slate-500 mt-2">Click ⚙ Settings to configure your LLM.</p>` : ''}
+      </div>`;
+    finalSection.classList.remove('hidden');
+  }
+}
+
+// ── Session settings (stored in sessionStorage) ───────────────────────────────
+function getSessionSettings() {
+  try {
+    return JSON.parse(sessionStorage.getItem('rootai_settings') || '{}');
+  } catch { return {}; }
+}
+function saveSessionSettings(s) {
+  sessionStorage.setItem('rootai_settings', JSON.stringify(s));
+}
+
+// ── Settings modal ────────────────────────────────────────────────────────────
+const settingsOverlay = $('settings-overlay');
+const btnSettings     = $('btn-settings');
+const btnCloseSettings= $('btn-close-settings');
+const btnSaveSettings = $('btn-save-settings');
+const settingsStatus  = $('settings-status');
+
+async function openSettings() {
+  // Load server settings
+  try {
+    const s = await fetch('/api/settings').then(r => r.json());
+    $('s-base-url').value = s.base_url || '';
+    $('s-model').value    = s.model    || '';
+    if (s.api_key_preview) {
+      $('s-api-key').placeholder = `Current: ${s.api_key_preview}`;
+    }
+  } catch {}
+  settingsOverlay.classList.remove('hidden');
+}
+
+btnSettings.addEventListener('click', openSettings);
+btnCloseSettings.addEventListener('click', () => settingsOverlay.classList.add('hidden'));
+settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) settingsOverlay.classList.add('hidden'); });
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $('s-base-url').value = btn.dataset.base || '';
+    $('s-model').value    = btn.dataset.model || '';
+    if (btn.dataset.key) $('s-api-key').value = btn.dataset.key;
+  });
+});
+
+btnSaveSettings.addEventListener('click', async () => {
+  const key  = $('s-api-key').value.trim();
+  const base = $('s-base-url').value.trim();
+  const mdl  = $('s-model').value.trim();
+
+  settingsStatus.textContent = 'Saving…';
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key:  key  || null,
+        base_url: base || null,
+        model:    mdl  || null,
+      }),
+    });
+    settingsStatus.textContent = '✓ Saved';
+    setTimeout(() => {
+      settingsStatus.textContent = '';
+      settingsOverlay.classList.add('hidden');
+    }, 800);
+  } catch (e) {
+    settingsStatus.textContent = 'Error saving';
+  }
+});
+
+// ── History sidebar ───────────────────────────────────────────────────────────
+const historySidebar  = $('history-sidebar');
+const historyOverlay  = $('history-overlay');
+const historyList     = $('history-list');
+const btnHistory      = $('btn-history');
+const btnCloseHistory = $('btn-close-history');
+
+function openHistory() {
+  historySidebar.classList.remove('translate-x-full');
+  historyOverlay.classList.remove('hidden');
+  loadHistory();
+}
+function closeHistory() {
+  historySidebar.classList.add('translate-x-full');
+  historyOverlay.classList.add('hidden');
+}
+
+btnHistory.addEventListener('click', openHistory);
+btnCloseHistory.addEventListener('click', closeHistory);
+historyOverlay.addEventListener('click', closeHistory);
+
+async function loadHistory() {
+  historyList.innerHTML = '<p class="text-xs text-slate-500 text-center py-10">Loading…</p>';
+  try {
+    const sessions = await fetch('/api/sessions').then(r => r.json());
+    if (!sessions.length) {
+      historyList.innerHTML = '<p class="text-xs text-slate-500 text-center py-10">No sessions yet</p>';
+      return;
+    }
+    historyList.innerHTML = '';
+    sessions.forEach(s => {
+      const btn = document.createElement('button');
+      const date = new Date(s.created_date);
+      const ago = timeAgo(date);
+      const conf = s.confidence_level != null
+        ? `<span class="text-[10px] text-violet-400">${s.confidence_level <= 1 ? Math.round(s.confidence_level * 100) : s.confidence_level}% conf</span>`
+        : '';
+      const review = s.human_review?.rating && s.human_review.rating !== 'pending'
+        ? `<span class="text-[10px] ${s.human_review.rating === 'approved' ? 'text-emerald-400' : 'text-amber-400'}">${s.human_review.rating}</span>`
+        : '';
+      const statusIcon = s.status === 'completed'
+        ? `<svg class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`
+        : `<svg class="w-3.5 h-3.5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+      btn.className = 'w-full text-left px-4 py-3 hover:bg-slate-900 transition-colors border-b border-slate-800/50 group';
+      btn.innerHTML = `<div class="flex items-start gap-2">${statusIcon}<div class="flex-1 min-w-0"><p class="text-xs text-slate-200 group-hover:text-white truncate leading-snug">${escHtml(s.query)}</p><div class="flex items-center gap-2 mt-1"><span class="text-[10px] text-slate-500">${ago}</span>${conf}${review}</div></div></div>`;
+      btn.addEventListener('click', () => {
+        queryInput.value = s.query;
+        closeHistory();
+        resetUI();
+      });
+      historyList.appendChild(btn);
+    });
+  } catch {
+    historyList.innerHTML = '<p class="text-xs text-red-400 text-center py-10">Failed to load history</p>';
+  }
+}
+
+function timeAgo(date) {
+  const diff = Math.floor((Date.now() - date) / 1000);
+  if (diff < 60)   return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400)return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+btnRun.addEventListener('click', () => {
+  const q = queryInput.value.trim();
+  if (!q || isRunning) return;
+  runPipeline(q);
+});
+
+queryInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    const q = queryInput.value.trim();
+    if (q && !isRunning) runPipeline(q);
+  }
+});
+
+btnReset.addEventListener('click', () => {
+  resetUI();
+  queryInput.value = '';
+});
+
+// ── Startup: check if API key is configured ───────────────────────────────────
+(async () => {
+  try {
+    const s = await fetch('/api/settings').then(r => r.json());
+    if (!s.api_key_set) {
+      // Delay a bit then open settings
+      setTimeout(openSettings, 800);
+    }
+  } catch {}
+})();
+</script>
+</body>
+</html>
