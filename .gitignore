@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment (created by run.py automatically)
+.venv/
+venv/
+env/
+
+# Environment variables — keep .env.example, NOT .env
+.env
+.env.local
+
+# Data files (session storage) — kept locally only
+data/*.json
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.sw?
+
+# Logs
+*.log
+npm-debug.log*
