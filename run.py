@@ -35,7 +35,7 @@ def _python_version_ok() -> bool:
 
 def _venv_python() -> Path:
     """Return the Python executable inside our local venv."""
-    venv = Path(".venv")
+    venv = Path(__file__).parent / ".venv"
     if sys.platform == "win32":
         return venv / "Scripts" / "python.exe"
     return venv / "bin" / "python"
@@ -43,7 +43,7 @@ def _venv_python() -> Path:
 
 def _ensure_venv() -> Path:
     """Create a venv if it doesn't exist, return its Python path."""
-    venv = Path(".venv")
+    venv = Path(__file__).parent / ".venv"
     py = _venv_python()
     if not py.exists():
         print("🔧  Creating virtual environment (.venv)…")
@@ -53,7 +53,7 @@ def _ensure_venv() -> Path:
 
 
 def _install_deps(py: Path) -> None:
-    req = Path("requirements.txt")
+    req = Path(__file__).parent / "requirements.txt"
     if not req.exists():
         return
     print("📦  Installing / verifying dependencies…")
@@ -64,8 +64,8 @@ def _install_deps(py: Path) -> None:
 
 
 def _setup_env() -> None:
-    env = Path(".env")
-    example = Path(".env.example")
+    env = Path(__file__).parent / ".env"
+    example = Path(__file__).parent / ".env.example"
     if not env.exists() and example.exists():
         shutil.copy(example, env)
         print("📝  Created .env from .env.example")
@@ -116,8 +116,13 @@ def main() -> None:
 
     threading.Thread(target=_open_browser, daemon=True).start()
 
-    # Re-launch with the venv Python so uvicorn is definitely available
-    if Path(py).resolve() != Path(sys.executable).resolve():
+    # Re-launch with the venv Python so uvicorn is definitely available.
+    # Compare sys.prefix to the venv directory rather than executable paths,
+    # because the venv Python may be a symlink to the same underlying binary.
+    # Use an absolute path derived from __file__ so this works regardless of
+    # the working directory from which run.py is invoked.
+    venv_dir = (Path(__file__).parent / ".venv").resolve()
+    if Path(sys.prefix).resolve() != venv_dir:
         os.execv(str(py), [str(py), __file__] + sys.argv[1:])
 
     # Already inside venv — start uvicorn
