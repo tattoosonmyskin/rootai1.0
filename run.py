@@ -74,7 +74,18 @@ def _setup_env() -> None:
 
 
 def _open_browser() -> None:
-    time.sleep(2.0)
+    """Wait until the server is reachable, then open the browser."""
+    import urllib.request
+    import urllib.error
+
+    deadline = time.monotonic() + 30.0          # give the server up to 30 s
+    while time.monotonic() < deadline:
+        try:
+            urllib.request.urlopen(URL + "/api/settings", timeout=1)
+            break                               # server responded — proceed
+        except (urllib.error.URLError, OSError):
+            time.sleep(0.25)
+
     try:
         webbrowser.open(URL)
     except Exception:

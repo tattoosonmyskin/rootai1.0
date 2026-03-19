@@ -58,6 +58,8 @@ class EntityStore:
     # ── public API ────────────────────────────────────────────────────────────
 
     def create(self, data: dict) -> dict:
+        # 'id' and 'created_date' are always system-generated; any values
+        # supplied in `data` for these keys are intentionally overwritten.
         item = {**data, "id": _generate_id(), "created_date": _now_iso()}
         with _lock_for(self.name):
             items = self._load()
